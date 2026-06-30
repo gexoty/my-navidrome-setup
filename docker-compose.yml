@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # YouTube загрузчик
+  metube:
+    image: ghcr.io/alexta69/metube
+    container_name: metube
+    restart: unless-stopped
+    user: "1000:1000"
+    volumes:
+      - /media/video:/downloads
+      - /media/music/youtube:/audio
+      - /opt/metube:/metube
+    networks:
+      - npm_default
+    environment:
+      AUDIO_DOWNLOAD_DIR: /audio
+      DOWNLOAD_DIR: /downloads
+      STATE_DIR: /metube
+
+  # Метаданные для музыки
+  metadata-docker:
+    image: oneandonlyjonnyponny/metadata-docker:latest
+    container_name: metadata-docker
+    restart: unless-stopped
+    volumes:
+      - /media/music:/music
+      - ./logs:/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG=False
+      - AUTH_USERNAME=CHANGELOGIN
+      - AUTH_PASSWORD=CHANGELOGIN
+      - TOKEN_EXPIRE_HOURS=24
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+    networks:
+      - npm_default
+
+  # Dromeport для Navidrome
+  dromeport:
+    image: ghcr.io/sensor0x0/dromeport:latest
+    container_name: dromeport
+    user: 1000:1000
+    restart: unless-stopped
+    volumes:
+      - /media/music/dromeport:/music
+    environment:
+      - DROMEPORT_LIBRARY_1=/music|MyLibrary
+    networks:
+      - npm_default
+
+  # WebPlayer для Navidrome
+  feishin:
+    container_name: feishin
+    image: 'ghcr.io/jeffvli/feishin:latest'
+    restart: unless-stopped 
+    environment:
+      - SERVER_TYPE=navidrome
+      - SERVER_LOCK=false
+      - ANALYTICS_DISABLED=true
+      - FS_GENERAL_THEME=defaultDark
+      - FS_GENERAL_LANGUAGE=en
+      - FS_PLAYBACK_DEFAULT_QUALITY=320
+    volumes:
+      - /opt/feishin/data:/app/data
+      - /media/music:/music:ro
+
+  #TorrentWeb клиент
+  transmission:
+    image: lscr.io/linuxserver/transmission:latest
+    container_name: transmission
+    restart: unless-stopped
+    user: 0:0
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=Europe/Moscow
+      - USER=CHANGEME
+      - PASS=CHANGEME
+    volumes:
+      - /opt/transmission/config:/config:rw
+      - /media/music/torrent:/downloads/music:rw
+      - /media/torrent:/downloads/torrent:rw
+    ports:
+      - "51413:51413"
+      - "51413:51413/udp"
+    networks:
+      - npm_default
+
+  #Navidrome - музыкальный стример
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    restart: unless-stopped
+    user: 1000:1000
+    environment:
+      ND_SCANSCHEDULE: 60m
+      ND_LOGLEVEL: info
+      ND_SESSIONTIMEOUT: 24h
+      ND_BASEURL: "https://public_url"
+      ND_ENABLETRANSCODINGCONFIG: true
+      ND_ADDRESS: 0.0.0.0
+      ND_PORT: 4533
+      ND_ENABLESHARING: true
+      ND_LASTFM_APIKEY: "api_key"
+      ND_LASTFM_SECRET: "secret"
+      ND_AGENTS: apple-music,deezer,lastfm,listenbrainz
+      ND_LYRICSPRIORITY: ".lrc,.txt,nd-lyrics,navidrome-shazam-plugin,embedded"
+    volumes:
+      - /opt/navidrome/data:/data
+      - /media/music:/music:rw
+    networks:
+      - npm_default
+
+    
+networks:
+  npm_default:
+    external: true
